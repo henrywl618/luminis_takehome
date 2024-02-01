@@ -56,6 +56,25 @@ class EncounterGenerator:
             )
         return output.getvalue()
 
+    def group_by_facility(self, events: List[Event]) -> GroupedEvents:
+        """Groups events by facility
+
+        Args:
+            events (List[Event])
+
+        Returns:
+            GroupedEvents: Dict with facility as the key and a list of events
+            as the value.
+        """
+        grouped_events: GroupedEvents = {}
+        for event in events:
+            facility = event.facility
+            if facility in grouped_events:
+                grouped_events[facility].append(event)
+            else:
+                grouped_events[facility] = [event]
+        return grouped_events
+
     def group_by_pt(self, events: List[Event]) -> GroupedEvents:
         """Groups events by patient identifier
 
@@ -91,14 +110,30 @@ class EncounterGenerator:
         for event in events:
             if not start_event and event.event_type == "Admission":
                 start_event = event
+            elif (
+                start_event
+                and event.event_type == "Admission"
+                and self.calc_stay_length(start_event.event_time, event.event_time)
+                > (60 * 60 * 24 * 30)
+            ):
+                encounter = Encounter(
+                    event.pt_identifier,
+                    event.facility,
+                    event.pt_complaint,
+                    event.pt_class,
+                    start_event.event_time,
+                    "N/A",
+                    "N/A",
+                )
+                start_event = event
+                encounters.append(encounter)
             elif event.event_type == "Discharge":
                 start_time = start_event.event_time if start_event else "N/A"
                 stay_length_hrs: str
                 if start_event:
-                    stay_length_sec = (
-                        datetime.fromisoformat(event.event_time)
-                        - datetime.fromisoformat(start_event.event_time)
-                    ).total_seconds()
+                    stay_length_sec = self.calc_stay_length(
+                        start_event.event_time, event.event_time 
+                    )
                     stay_length_hrs = str(round(stay_length_sec / (60 * 60), 2))
                 else:
                     stay_length_hrs = "N/A"
@@ -115,3 +150,10 @@ class EncounterGenerator:
                 start_event = None
                 encounters.append(encounter)
         return encounters
+
+    def calc_stay_length(self, start_time: str, end_time: str) -> float:
+        x = (
+            datetime.fromisoformat(end_time) - datetime.fromisoformat(start_time)
+        ).total_seconds()
+        print(x)
+        return x

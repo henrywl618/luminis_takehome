@@ -49,6 +49,15 @@ class EncounterGeneratorTests(TestCase):
         self.assertEqual(len(grouped_events["123456"]), 2)
         self.assertIsNotNone(grouped_events.get("654321"))
         self.assertEqual(len(grouped_events["654321"]), 2)
+    
+    def test_group_by_facility(self):
+        """It tests that Events are grouped by facility."""
+        self.events[3].facility = "Northwell"
+        grouped_events = self.ec.group_by_facility(self.events)
+        self.assertIsNotNone(grouped_events.get("Sacred Heart"))
+        self.assertEqual(len(grouped_events["Sacred Heart"]), 3)
+        self.assertIsNotNone(grouped_events.get("Northwell"))
+        self.assertEqual(len(grouped_events["Northwell"]), 1)
 
     def test_generate_encounters(self):
         """It tests that Encounters are generated."""
@@ -95,3 +104,17 @@ class EncounterGeneratorTests(TestCase):
         self.assertEqual(encounters[0].end_time, "2017-02-16T06:01:00-05:00")
         self.assertEqual(encounters[1].begin_time, "2017-03-13T06:01:00-05:00")
         self.assertEqual(encounters[1].end_time, "2017-03-16T06:01:00-05:00")
+    
+    def test_same_pt_multiple_admissions(self):
+        """It tests multiple Encounters are generated for consecutive admissions >30 apart"""
+        # Mock another admission/discharge event for pt "123456"
+        self.events[3].event_type = "Admission"
+        self.events[3].event_time = "2017-05-16T06:01:00-05:00"
+        encounters = self.ec.generate_encounters(self.events)
+        self.assertEqual(len(encounters), 3)
+        self.assertEqual(encounters[0].begin_time, "2017-02-13T06:01:00-05:00")
+        self.assertEqual(encounters[0].end_time, "2017-02-16T06:01:00-05:00")
+        self.assertEqual(encounters[1].begin_time, "2017-03-13T06:01:00-05:00")
+        self.assertEqual(encounters[1].end_time, "N/A")
+        self.assertEqual(encounters[2].begin_time, "2017-04-16T06:01:00-05:00")
+        self.assertEqual(encounters[2].end_time, "N/A")
